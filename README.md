@@ -1,69 +1,65 @@
 # Net Control (netctl)
 
-A desktop application for running ham radio nets with ICS 309 form generation, participant management, and real-time logging.
+A desktop application for amateur radio net control operators. Manage check-ins, log communications, and generate ICS 309 forms.
 
 ## Features
 
-- **Net Session Management**: Create and manage net sessions with metadata (net name, frequency, net control operator)
-- **Real-time Timer**: Track net duration from session start
-- **Participant Check-in**: Quick entry for callsigns with automatic name/QTH lookup via HamDB API
-- **Communication Log**: Timestamped log entries per ICS 309 specification
-- **ICS 309 Preview**: Real-time preview of the ICS 309 form
-- **Export Options**: Export to PDF or CSV formats
-- **SQLite Database**: Persistent storage for sessions, participants, and log entries
+- **Session Management** - Create net sessions with name, frequency, and net control operator info
+- **Automatic Check-in** - Net control is automatically checked in as participant #1
+- **Callsign Lookup** - Automatic name/QTH lookup via HamDB API with local caching
+- **Tactical Callsigns** - Support for tactical calls alongside FCC callsigns
+- **Communication Log** - Timestamped entries with From/To/Message per ICS 309 spec
+- **Real-time Timer** - Track net duration from when the net opens
+- **ICS 309 Preview** - Live preview of the ICS 309 form as you work
+- **Export** - PDF and CSV export options
+- **Persistent Storage** - SQLite database for sessions, participants, and logs
 
-## Technology Stack
-
-- **Frontend**: React + TypeScript
-- **Backend**: Tauri (Rust)
-- **Styling**: Tailwind CSS
-- **State Management**: Zustand
-- **PDF Generation**: pdf-lib
-- **Database**: SQLite via rusqlite
-
-## Development
+## Installation
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18+)
+**All platforms:**
+- [Node.js](https://nodejs.org/) v18+
 - [Rust](https://www.rust-lang.org/tools/install)
-- [Tauri CLI](https://tauri.app/v2/guides/getting-started/prerequisites)
 
-### Setup
+**Linux (Debian/Ubuntu):**
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+```
+
+### Build from Source
 
 ```bash
-# Install dependencies
 npm install
-
-# Run in development mode
-npm run tauri dev
-
-# Build for production
 npm run tauri build
+```
+
+The built application will be in `src-tauri/target/release/bundle/`.
+
+### Development
+
+```bash
+npm run tauri dev
 ```
 
 ## Usage
 
-1. **Start a New Session**: Enter net name, frequency, and net control operator info
-2. **Check In Stations**: Enter callsigns - the app will auto-lookup name and location from HamDB
-3. **Log Communications**: Click on a participant to create a log entry, or manually enter From/To callsigns
-4. **Preview ICS 309**: Click "Show ICS 309 Preview" to see the form in real-time
-5. **Export**: Export to PDF or CSV when the net is complete
-6. **Close Net**: Click "Close Net" to finalize the session
+1. **Create Session** - Enter net name, frequency, and net control operator info
+2. **Open Net** - Click "Open Net" to start the timer and begin operations
+3. **Check In Stations** - Enter callsigns (F2 to quick-focus). Name and location are auto-populated from HamDB
+4. **Log Communications** - Click a participant to pre-fill the From field, or enter manually. Use "NC" for net control or "ALL" for all stations
+5. **Preview/Export** - View the ICS 309 preview and export to PDF or CSV
+6. **Close Net** - Click "Close Net" when finished
 
-## Keyboard Shortcuts
+## Tech Stack
 
-- **F2**: Focus the callsign input field for quick check-ins
-
-## ICS 309 Form Fields
-
-Per FEMA ICS 309 specification:
-1. Incident Name (Net Name)
-2. Operational Period (Start time and status)
-3. Radio Operator (Net Control callsign and name)
-4. Log entries table (Time, Entry #, From, To, Message)
-5. Page number
-6. Prepared by (signature line)
+| Component | Technology |
+|-----------|------------|
+| Frontend | React, TypeScript, Tailwind CSS |
+| Backend | Tauri (Rust) |
+| State | Zustand |
+| Database | SQLite (rusqlite) |
+| PDF | pdf-lib |
 
 ## License
 

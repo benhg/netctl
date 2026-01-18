@@ -46,6 +46,7 @@ export function LogEntryForm({ selectedParticipant, onClear }: LogEntryFormProps
   // Build datalist options with both callsigns and tactical calls
   const callsignOptions: { value: string; label: string }[] = [
     { value: 'NC', label: 'NC (Net Control)' },
+    { value: 'ALL', label: 'ALL (All Stations)' },
   ];
 
   for (const p of participants) {
