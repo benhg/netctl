@@ -10,23 +10,34 @@ function formatDuration(ms: number): string {
 }
 
 export function Header() {
-  const { session, getElapsedTime, closeSession } = useNetStore();
+  const { session, getElapsedTime, openSession, closeSession } = useNetStore();
   const [elapsed, setElapsed] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    if (session?.status === 'active') {
-      const interval = setInterval(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+      if (session?.status === 'active') {
         setElapsed(getElapsedTime());
-      }, 1000);
-      return () => clearInterval(interval);
-    }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
   }, [session?.status, getElapsedTime]);
 
   if (!session) {
     return (
       <header className="bg-slate-800 text-white p-4 border-b border-slate-700">
-        <h1 className="text-2xl font-bold">Net Control</h1>
-        <p className="text-slate-400 text-sm">Create a new session to get started</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold">Net Control</h1>
+            <p className="text-slate-400 text-sm">Create a new session to get started</p>
+          </div>
+          <div className="text-sm font-mono text-slate-300">
+            <span>{currentTime.toLocaleTimeString()} Local</span>
+            <span className="mx-2">|</span>
+            <span>{currentTime.toISOString().slice(11, 19)}Z</span>
+          </div>
+        </div>
       </header>
     );
   }
@@ -44,7 +55,21 @@ export function Header() {
         </div>
         <div className="text-right">
           <div className="flex items-center gap-3">
-            {session.status === 'active' ? (
+            {session.status === 'pending' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  <span className="text-yellow-400 text-sm font-medium">PENDING</span>
+                </div>
+                <button
+                  onClick={openSession}
+                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                >
+                  Open Net
+                </button>
+              </>
+            )}
+            {session.status === 'active' && (
               <>
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -57,11 +82,19 @@ export function Header() {
                   Close Net
                 </button>
               </>
-            ) : (
+            )}
+            {session.status === 'closed' && (
               <span className="text-slate-400 text-sm font-medium">CLOSED</span>
             )}
           </div>
-          <div className="text-3xl font-mono mt-2">{formatDuration(elapsed)}</div>
+          <div className="flex items-baseline gap-4 mt-2">
+            <div className="text-3xl font-mono">{formatDuration(elapsed)}</div>
+            <div className="text-sm font-mono text-slate-300">
+              <span>{currentTime.toLocaleTimeString()} Local</span>
+              <span className="mx-2">|</span>
+              <span>{currentTime.toISOString().slice(11, 19)}Z</span>
+            </div>
+          </div>
           <div className="text-xs text-slate-400">
             Started: {new Date(session.dateTime).toLocaleString()}
           </div>

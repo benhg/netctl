@@ -13,6 +13,7 @@ interface NetStore {
 
   // Session actions
   createSession: (session: Omit<NetSession, 'id' | 'status' | 'dateTime'>) => void;
+  openSession: () => void;
   closeSession: () => void;
   loadSession: (id: string) => Promise<void>;
 
@@ -50,19 +51,42 @@ export const useNetStore = create<NetStore>((set, get) => ({
       id: uuidv4(),
       ...sessionData,
       dateTime: new Date().toISOString(),
-      status: 'active',
+      status: 'pending',
+    };
+    const netControlParticipant: Participant = {
+      id: uuidv4(),
+      callsign: sessionData.netControlOp,
+      tacticalCall: 'NET',
+      name: sessionData.netControlName,
+      location: '',
+      checkInTime: new Date().toISOString(),
+      checkInNumber: 1,
     };
     set({
       session,
-      participants: [],
+      participants: [netControlParticipant],
       logEntries: [],
-      startTime: Date.now(),
+      startTime: null,
       error: null
     });
 
     invoke('save_session', { session }).catch((err) => {
       set({ error: `Failed to save session: ${err}` });
     });
+    invoke('save_participant', { sessionId: session.id, participant: netControlParticipant }).catch((err) => {
+      set({ error: `Failed to save net control participant: ${err}` });
+    });
+  },
+
+  openSession: () => {
+    const { session } = get();
+    if (session && session.status === 'pending') {
+      const activeSession = { ...session, status: 'active' as const };
+      set({ session: activeSession, startTime: Date.now() });
+      invoke('save_session', { session: activeSession }).catch((err) => {
+        set({ error: `Failed to open session: ${err}` });
+      });
+    }
   },
 
   closeSession: () => {
