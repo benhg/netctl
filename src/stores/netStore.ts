@@ -12,7 +12,7 @@ interface NetStore {
   startTime: number | null;
 
   // Session actions
-  createSession: (session: Omit<NetSession, 'id' | 'status' | 'dateTime'>) => void;
+  createSession: (session: Omit<NetSession, 'id' | 'status' | 'dateTime' | 'endTime' | 'lastAcknowledgedEntryId'>) => void;
   openSession: () => void;
   closeSession: () => void;
   loadSession: (id: string) => Promise<void>;
@@ -21,9 +21,11 @@ interface NetStore {
   addParticipant: (participant: Omit<Participant, 'id' | 'checkInTime' | 'checkInNumber'>) => void;
   getDisplayCallsign: (callsign: string) => string;
   removeParticipant: (id: string) => void;
+  updateParticipant: (id: string, updates: Pick<Participant, 'callsign' | 'tacticalCall' | 'name' | 'location'>) => void;
 
   // Log entry actions
   addLogEntry: (entry: Omit<LogEntry, 'id' | 'entryNumber' | 'time'>) => void;
+  setLastAcknowledgedEntry: (entryId: string) => void;
 
   // Callsign lookup
   lookupCallsign: (callsign: string) => Promise<CallsignLookupResult | null>;
@@ -51,7 +53,9 @@ export const useNetStore = create<NetStore>((set, get) => ({
       id: uuidv4(),
       ...sessionData,
       dateTime: new Date().toISOString(),
+      endTime: null,
       status: 'pending',
+      lastAcknowledgedEntryId: null,
     };
     const netControlParticipant: Participant = {
       id: uuidv4(),
@@ -81,7 +85,7 @@ export const useNetStore = create<NetStore>((set, get) => ({
   openSession: () => {
     const { session } = get();
     if (session && session.status === 'pending') {
-      const activeSession = { ...session, status: 'active' as const };
+      const activeSession = { ...session, status: 'active' as const, endTime: null };
       set({ session: activeSession, startTime: Date.now() });
       invoke('save_session', { session: activeSession }).catch((err) => {
         set({ error: `Failed to open session: ${err}` });
@@ -92,7 +96,11 @@ export const useNetStore = create<NetStore>((set, get) => ({
   closeSession: () => {
     const { session } = get();
     if (session) {
-      const closedSession = { ...session, status: 'closed' as const };
+      const closedSession = {
+        ...session,
+        status: 'closed' as const,
+        endTime: new Date().toISOString(),
+      };
       set({ session: closedSession, startTime: null });
       invoke('save_session', { session: closedSession }).catch((err) => {
         set({ error: `Failed to close session: ${err}` });
@@ -136,11 +144,80 @@ export const useNetStore = create<NetStore>((set, get) => ({
         set({ error: `Failed to save participant: ${err}` });
       });
     }
+
+    if (session?.status === 'active') {
+      get().addLogEntry({
+        fromCallsign: participant.callsign,
+        toCallsign: 'NC',
+        message: 'check in',
+      });
+    }
   },
 
   removeParticipant: (id) => {
     const { participants } = get();
     set({ participants: participants.filter((p) => p.id !== id) });
+  },
+
+  updateParticipant: (id, updates) => {
+    const { participants, logEntries, session } = get();
+    const participant = participants.find((p) => p.id === id);
+    if (!participant) return;
+
+    const normalizedUpdates = {
+      callsign: updates.callsign.trim().toUpperCase(),
+      tacticalCall: updates.tacticalCall.trim(),
+      name: updates.name.trim(),
+      location: updates.location.trim(),
+    };
+
+    const updatedParticipant: Participant = {
+      ...participant,
+      ...normalizedUpdates,
+    };
+
+    const updatedParticipants = participants.map((p) => (p.id === id ? updatedParticipant : p));
+
+    const oldCallsign = participant.callsign;
+    const oldTactical = participant.tacticalCall;
+    const newCallsign = updatedParticipant.callsign;
+    const newTactical = updatedParticipant.tacticalCall;
+    const fallbackCallsign = newTactical || newCallsign;
+
+    const entriesToPersist: LogEntry[] = [];
+    const updatedEntries = logEntries.map((entry) => {
+      const fromCallsign =
+        entry.fromCallsign === oldCallsign
+          ? newCallsign
+          : oldTactical && entry.fromCallsign === oldTactical
+            ? fallbackCallsign
+            : entry.fromCallsign;
+      const toCallsign =
+        entry.toCallsign === oldCallsign
+          ? newCallsign
+          : oldTactical && entry.toCallsign === oldTactical
+            ? fallbackCallsign
+            : entry.toCallsign;
+      if (fromCallsign === entry.fromCallsign && toCallsign === entry.toCallsign) {
+        return entry;
+      }
+      const updatedEntry = { ...entry, fromCallsign, toCallsign };
+      entriesToPersist.push(updatedEntry);
+      return updatedEntry;
+    });
+
+    set({ participants: updatedParticipants, logEntries: updatedEntries });
+
+    if (session) {
+      invoke('save_participant', { sessionId: session.id, participant: updatedParticipant }).catch((err) => {
+        set({ error: `Failed to save participant: ${err}` });
+      });
+      for (const entry of entriesToPersist) {
+        invoke('save_log_entry', { sessionId: session.id, entry }).catch((err) => {
+          set({ error: `Failed to save log entry: ${err}` });
+        });
+      }
+    }
   },
 
   getDisplayCallsign: (callsign) => {
@@ -168,6 +245,19 @@ export const useNetStore = create<NetStore>((set, get) => ({
         set({ error: `Failed to save log entry: ${err}` });
       });
     }
+  },
+
+  setLastAcknowledgedEntry: (entryId) => {
+    const { session } = get();
+    if (!session) return;
+    const updatedSession: NetSession = {
+      ...session,
+      lastAcknowledgedEntryId: entryId,
+    };
+    set({ session: updatedSession });
+    invoke('save_session', { session: updatedSession }).catch((err) => {
+      set({ error: `Failed to save session: ${err}` });
+    });
   },
 
   lookupCallsign: async (callsign) => {

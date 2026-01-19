@@ -9,7 +9,9 @@ pub struct NetSession {
     pub net_control_op: String,
     pub net_control_name: String,
     pub date_time: String,
+    pub end_time: Option<String>,
     pub status: String,
+    pub last_acknowledged_entry_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

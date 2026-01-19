@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { NewSessionForm } from './components/NewSessionForm';
 import { CheckInForm } from './components/CheckInForm';
@@ -14,9 +14,45 @@ function App() {
   const { session, reset } = useNetStore();
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isAccel = e.metaKey || e.ctrlKey;
+      if (!isAccel) return;
+
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        setZoom((current) => Math.min(1.5, Math.round((current + 0.1) * 10) / 10));
+      } else if (e.key === '-') {
+        e.preventDefault();
+        setZoom((current) => Math.max(0.8, Math.round((current - 0.1) * 10) / 10));
+      } else if (e.key === '0') {
+        e.preventDefault();
+        setZoom(1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const supportsZoom = typeof CSS !== 'undefined' && CSS.supports?.('zoom', '1');
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
+    <div
+      className="min-h-screen bg-slate-900 text-white"
+      style={
+        supportsZoom
+          ? { zoom }
+          : {
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
+              width: `${100 / zoom}%`,
+              height: `${100 / zoom}%`,
+            }
+      }
+    >
       <Header />
 
       {!session ? (

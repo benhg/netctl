@@ -43,9 +43,14 @@ export async function generateICS309PDF(
   // 2. Operational Period
   const midX = width / 2;
   page.drawText('2. Operational Period:', { x: midX, y: y - 15, size: 9, font: helvetica });
-  const dateStr = new Date(session.dateTime).toLocaleString();
-  page.drawText(`Started: ${dateStr}`, { x: midX, y: y - 28, size: 10, font: helvetica });
-  page.drawText(`Status: ${session.status}`, { x: midX, y: y - 42, size: 10, font: helvetica });
+  const startStr = new Date(session.dateTime).toLocaleString();
+  const lastEntry = logEntries[logEntries.length - 1];
+  const rawEndTime = session.status === 'closed'
+    ? session.endTime || lastEntry?.time || session.dateTime
+    : null;
+  const endStr = rawEndTime ? new Date(rawEndTime).toLocaleString() : 'Present';
+  page.drawText(`Start: ${startStr}`, { x: midX, y: y - 28, size: 10, font: helvetica });
+  page.drawText(`End: ${endStr}`, { x: midX, y: y - 42, size: 10, font: helvetica });
 
   y -= 75;
 

@@ -21,6 +21,19 @@ export function ICS309Preview() {
     });
   };
 
+  const getOperationalPeriodEnd = (): string => {
+    if (session.status === 'closed') {
+      const lastEntry = logEntries[logEntries.length - 1];
+      return session.endTime || lastEntry?.time || session.dateTime;
+    }
+    if (session.status === 'active') {
+      return new Date().toISOString();
+    }
+    return session.dateTime;
+  };
+
+  const operationalPeriodEnd = getOperationalPeriodEnd();
+
   return (
     <div className="bg-white text-black p-6 rounded-lg shadow-lg max-h-[600px] overflow-y-auto">
       <div className="border-2 border-black">
@@ -46,7 +59,9 @@ export function ICS309Preview() {
           </div>
           <div className="p-2">
             <div className="text-xs text-gray-600">2. Operational Period</div>
-            <div>{formatDate(session.dateTime)} {formatTime(session.dateTime)} - {session.status === 'closed' ? 'Closed' : 'Active'}</div>
+            <div>
+              {formatDate(session.dateTime)} {formatTime(session.dateTime)} - {formatDate(operationalPeriodEnd)} {formatTime(operationalPeriodEnd)}
+            </div>
           </div>
         </div>
 

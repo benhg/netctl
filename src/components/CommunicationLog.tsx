@@ -1,7 +1,7 @@
 import { useNetStore } from '../stores/netStore';
 
 export function CommunicationLog() {
-  const { logEntries } = useNetStore();
+  const { logEntries, participants, session, setLastAcknowledgedEntry } = useNetStore();
 
   const formatTime = (isoString: string): string => {
     return new Date(isoString).toLocaleTimeString('en-US', {
@@ -10,6 +10,41 @@ export function CommunicationLog() {
       second: '2-digit',
       hour12: false,
     });
+  };
+
+  const findParticipant = (callsign: string) => {
+    const directMatch = participants.find(
+      (p) => p.callsign === callsign || p.tacticalCall === callsign
+    );
+    if (directMatch) return directMatch;
+
+    if (callsign === 'NC' && session?.netControlOp) {
+      return participants.find(
+        (p) => p.callsign === session.netControlOp || p.tacticalCall === 'NET'
+      );
+    }
+
+    return null;
+  };
+
+  const renderCallsign = (callsign: string) => {
+    const participant = findParticipant(callsign);
+
+    if (!participant) {
+      return <span className="font-mono text-slate-300">{callsign}</span>;
+    }
+
+    return (
+      <div className="flex flex-col leading-tight">
+        <div className="flex items-center gap-2">
+          {participant.tacticalCall && (
+            <span className="font-semibold text-yellow-400">{participant.tacticalCall}</span>
+          )}
+          <span className="font-mono text-blue-400 font-semibold">{participant.callsign}</span>
+        </div>
+        {participant.name && <span className="text-xs text-white">{participant.name}</span>}
+      </div>
+    );
   };
 
   return (
@@ -27,9 +62,10 @@ export function CommunicationLog() {
               <tr className="text-left text-slate-400 border-b border-slate-700">
                 <th className="pb-2 pr-2 w-12">#</th>
                 <th className="pb-2 pr-2 w-20">Time</th>
-                <th className="pb-2 pr-2 w-24">From</th>
-                <th className="pb-2 pr-2 w-24">To</th>
+                <th className="pb-2 pr-2 w-28">From</th>
+                <th className="pb-2 pr-2 w-28">To</th>
                 <th className="pb-2">Message</th>
+                <th className="pb-2 pl-2 w-20">Ack</th>
               </tr>
             </thead>
             <tbody>
@@ -37,9 +73,23 @@ export function CommunicationLog() {
                 <tr key={entry.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                   <td className="py-2 pr-2 text-slate-500">{entry.entryNumber}</td>
                   <td className="py-2 pr-2 font-mono text-slate-300">{formatTime(entry.time)}</td>
-                  <td className="py-2 pr-2 font-mono text-blue-400">{entry.fromCallsign}</td>
-                  <td className="py-2 pr-2 font-mono text-green-400">{entry.toCallsign}</td>
+                  <td className="py-2 pr-2">{renderCallsign(entry.fromCallsign)}</td>
+                  <td className="py-2 pr-2">{renderCallsign(entry.toCallsign)}</td>
                   <td className="py-2 text-white">{entry.message || '-'}</td>
+                  <td className="py-2 pl-2">
+                    {session?.lastAcknowledgedEntryId === entry.id ? (
+                      <span className="text-xs text-green-400 font-semibold">NC ACK</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setLastAcknowledgedEntry(entry.id)}
+                        disabled={session?.status !== 'active'}
+                        className="text-xs px-2 py-1 border border-slate-600 rounded text-slate-200 hover:border-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Mark
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

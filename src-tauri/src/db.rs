@@ -18,7 +18,9 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             net_control_op TEXT NOT NULL,
             net_control_name TEXT,
             date_time TEXT NOT NULL,
-            status TEXT NOT NULL
+            end_time TEXT,
+            status TEXT NOT NULL,
+            last_acknowledged_entry_id TEXT
         )",
         [],
     )?;
@@ -40,6 +42,8 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
     // Migration: add tactical_call column if it doesn't exist
     let _ = conn.execute("ALTER TABLE participants ADD COLUMN tactical_call TEXT", []);
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN end_time TEXT", []);
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN last_acknowledged_entry_id TEXT", []);
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS log_entries (
@@ -73,8 +77,8 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
 pub fn save_session(conn: &Connection, session: &NetSession) -> Result<()> {
     conn.execute(
-        "INSERT OR REPLACE INTO sessions (id, name, frequency, net_control_op, net_control_name, date_time, status)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT OR REPLACE INTO sessions (id, name, frequency, net_control_op, net_control_name, date_time, end_time, status, last_acknowledged_entry_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             session.id,
             session.name,
@@ -82,7 +86,9 @@ pub fn save_session(conn: &Connection, session: &NetSession) -> Result<()> {
             session.net_control_op,
             session.net_control_name,
             session.date_time,
+            session.end_time,
             session.status,
+            session.last_acknowledged_entry_id,
         ],
     )?;
     Ok(())
@@ -125,7 +131,7 @@ pub fn save_log_entry(conn: &Connection, session_id: &str, entry: &LogEntry) -> 
 
 pub fn load_session(conn: &Connection, id: &str) -> Result<Option<NetSession>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, frequency, net_control_op, net_control_name, date_time, status FROM sessions WHERE id = ?1"
+        "SELECT id, name, frequency, net_control_op, net_control_name, date_time, end_time, status, last_acknowledged_entry_id FROM sessions WHERE id = ?1"
     )?;
 
     let mut rows = stmt.query(params![id])?;
@@ -138,7 +144,9 @@ pub fn load_session(conn: &Connection, id: &str) -> Result<Option<NetSession>> {
             net_control_op: row.get(3)?,
             net_control_name: row.get(4)?,
             date_time: row.get(5)?,
-            status: row.get(6)?,
+            end_time: row.get(6)?,
+            status: row.get(7)?,
+            last_acknowledged_entry_id: row.get(8)?,
         }))
     } else {
         Ok(None)

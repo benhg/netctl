@@ -23,8 +23,7 @@ export function LogEntryForm({ selectedParticipant, onClear }: LogEntryFormProps
     }
   }, [selectedParticipant]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitEntry = () => {
     if (!fromCallsign.trim()) return;
 
     addLogEntry({
@@ -39,23 +38,39 @@ export function LogEntryForm({ selectedParticipant, onClear }: LogEntryFormProps
     onClear();
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitEntry();
+  };
+
+  const handleMessageKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitEntry();
+    }
+  };
+
   if (!session || session.status !== 'active') {
     return null;
   }
 
   // Build datalist options with both callsigns and tactical calls
-  const callsignOptions: { value: string; label: string }[] = [
-    { value: 'NC', label: 'NC (Net Control)' },
-    { value: 'ALL', label: 'ALL (All Stations)' },
-  ];
+  const callsignOptions: { value: string; label: string }[] = [];
+  const optionMap = new Map<string, string>();
+
+  optionMap.set('NC', 'NC (Net Control)');
+  optionMap.set('ALL', 'ALL (All Stations)');
 
   for (const p of participants) {
-    // Add FCC callsign
-    callsignOptions.push({ value: p.callsign, label: p.callsign });
-    // Add tactical call if present
+    optionMap.set(p.callsign, p.name ? `${p.callsign} - ${p.name}` : p.callsign);
     if (p.tacticalCall) {
-      callsignOptions.push({ value: p.tacticalCall, label: `${p.tacticalCall} (${p.callsign})` });
+      const label = `${p.tacticalCall} (${p.callsign})${p.name ? ` - ${p.name}` : ''}`;
+      optionMap.set(p.tacticalCall, label);
     }
+  }
+
+  for (const [value, label] of optionMap.entries()) {
+    callsignOptions.push({ value, label });
   }
 
   return (
@@ -70,6 +85,7 @@ export function LogEntryForm({ selectedParticipant, onClear }: LogEntryFormProps
             onChange={(e) => setFromCallsign(e.target.value)}
             placeholder="Callsign or Tactical"
             list="callsign-list"
+            autoComplete="off"
             className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -81,6 +97,7 @@ export function LogEntryForm({ selectedParticipant, onClear }: LogEntryFormProps
             onChange={(e) => setToCallsign(e.target.value)}
             placeholder="NC"
             list="callsign-list"
+            autoComplete="off"
             className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -91,6 +108,7 @@ export function LogEntryForm({ selectedParticipant, onClear }: LogEntryFormProps
           ref={messageRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleMessageKeyDown}
           placeholder="Traffic, announcements, or remarks..."
           rows={2}
           className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
@@ -115,8 +133,8 @@ export function LogEntryForm({ selectedParticipant, onClear }: LogEntryFormProps
         )}
       </div>
       <datalist id="callsign-list">
-        {callsignOptions.map((opt, i) => (
-          <option key={i} value={opt.value}>{opt.label}</option>
+        {callsignOptions.map((opt) => (
+          <option key={opt.value} value={opt.value} label={opt.label} />
         ))}
       </datalist>
     </form>

@@ -5,7 +5,9 @@ export interface NetSession {
   netControlOp: string;
   netControlName: string;
   dateTime: string;
+  endTime: string | null;
   status: 'pending' | 'active' | 'closed';
+  lastAcknowledgedEntryId: string | null;
 }
 
 export interface Participant {
