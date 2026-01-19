@@ -65,7 +65,7 @@ export function CommunicationLog() {
                 <th className="pb-2 pr-2 w-28">From</th>
                 <th className="pb-2 pr-2 w-28">To</th>
                 <th className="pb-2">Message</th>
-                <th className="pb-2 pl-2 w-20">Ack</th>
+                <th className="pb-2 w-20">Ack</th>
               </tr>
             </thead>
             <tbody>
@@ -76,15 +76,14 @@ export function CommunicationLog() {
                   <td className="py-2 pr-2">{renderCallsign(entry.fromCallsign)}</td>
                   <td className="py-2 pr-2">{renderCallsign(entry.toCallsign)}</td>
                   <td className="py-2 text-white">{entry.message || '-'}</td>
-                  <td className="py-2 pl-2">
+                  <td className="py-2">
                     {session?.lastAcknowledgedEntryId === entry.id ? (
-                      <span className="text-xs text-green-400 font-semibold">NC ACK</span>
+                      <span className="text-xs font-semibold text-emerald-300">NC ACK</span>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setLastAcknowledgedEntry(entry.id)}
-                        disabled={session?.status !== 'active'}
-                        className="text-xs px-2 py-1 border border-slate-600 rounded text-slate-200 hover:border-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-xs text-slate-300 hover:text-white"
                       >
                         Mark
                       </button>
