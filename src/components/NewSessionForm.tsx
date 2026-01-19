@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { open } from '@tauri-apps/plugin-dialog';
+import { readTextFile } from '@tauri-apps/plugin-fs';
 import { useNetStore } from '../stores/netStore';
 
 export function NewSessionForm() {
-  const { createSession, session } = useNetStore();
+  const { createSession, importFromCsv, session } = useNetStore();
   const [name, setName] = useState('');
   const [frequency, setFrequency] = useState('');
   const [netControlOp, setNetControlOp] = useState('');
@@ -18,6 +20,16 @@ export function NewSessionForm() {
       netControlOp: netControlOp.toUpperCase().trim(),
       netControlName: netControlName.trim(),
     });
+  };
+
+  const handleImport = async () => {
+    const path = await open({
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+      multiple: false,
+    });
+    if (!path || Array.isArray(path)) return;
+    const csvText = await readTextFile(path);
+    importFromCsv(csvText);
   };
 
   if (session) {
@@ -82,6 +94,14 @@ export function NewSessionForm() {
             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
           >
             Start Net
+          </button>
+
+          <button
+            type="button"
+            onClick={handleImport}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded transition-colors"
+          >
+            Import CSV
           </button>
         </div>
       </form>

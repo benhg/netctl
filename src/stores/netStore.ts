@@ -35,6 +35,7 @@ interface NetStore {
 
   // Export
   exportToCsv: () => string;
+  importFromCsv: (csvText: string) => void;
 
   // Reset
   reset: () => void;
@@ -302,6 +303,159 @@ export const useNetStore = create<NetStore>((set, get) => ({
     }
 
     return lines.join('\n');
+  },
+
+  importFromCsv: (csvText) => {
+    const parseCsvLine = (line: string) => {
+      const fields: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const char = line[i];
+        if (inQuotes) {
+          if (char === '"' && line[i + 1] === '"') {
+            current += '"';
+            i += 1;
+          } else if (char === '"') {
+            inQuotes = false;
+          } else {
+            current += char;
+          }
+        } else if (char === ',') {
+          fields.push(current);
+          current = '';
+        } else if (char === '"') {
+          inQuotes = true;
+        } else {
+          current += char;
+        }
+      }
+      fields.push(current);
+      return fields;
+    };
+
+    try {
+      const normalized = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const lines = normalized.split('\n');
+      const getValueAfterLabel = (label: string) => {
+        const line = lines.find((row) => row.startsWith(`${label},`));
+        if (!line) return '';
+        const [, ...rest] = parseCsvLine(line);
+        return rest.join(',').trim();
+      };
+
+      const name = getValueAfterLabel('Net Name') || 'Imported Net';
+      const frequency = getValueAfterLabel('Frequency');
+      const netControlLine = getValueAfterLabel('Net Control');
+      const [netControlOpRaw, ...netControlNameParts] = netControlLine.split(' - ');
+      const netControlOp = netControlOpRaw?.trim().toUpperCase() || 'NET';
+      const netControlName = netControlNameParts.join(' - ').trim();
+      const dateTime = getValueAfterLabel('Date/Time') || new Date().toISOString();
+
+      const participants: Participant[] = [];
+      const logEntries: LogEntry[] = [];
+      let section: 'participants' | 'log' | null = null;
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        if (line === 'Participants') {
+          section = 'participants';
+          continue;
+        }
+        if (line === 'Communications Log') {
+          section = 'log';
+          continue;
+        }
+        if (line.startsWith('Check-In #') || line.startsWith('Entry #')) {
+          continue;
+        }
+        if (!section) continue;
+
+        const fields = parseCsvLine(line);
+        if (section === 'participants') {
+          const [checkInNumberRaw, callsignRaw, tacticalCall, nameField, location, checkInTime] =
+            fields;
+          if (!callsignRaw) continue;
+          const checkInNumber = Number.parseInt(checkInNumberRaw, 10);
+          participants.push({
+            id: uuidv4(),
+            callsign: callsignRaw.trim().toUpperCase(),
+            tacticalCall: (tacticalCall || '').trim(),
+            name: (nameField || '').trim(),
+            location: (location || '').trim(),
+            checkInTime: (checkInTime || '').trim() || dateTime,
+            checkInNumber: Number.isFinite(checkInNumber) ? checkInNumber : participants.length + 1,
+          });
+        } else if (section === 'log') {
+          const [entryNumberRaw, time, fromCallsign, toCallsign, message] = fields;
+          if (!fromCallsign && !toCallsign && !message) continue;
+          const entryNumber = Number.parseInt(entryNumberRaw, 10);
+          logEntries.push({
+            id: uuidv4(),
+            entryNumber: Number.isFinite(entryNumber) ? entryNumber : logEntries.length + 1,
+            time: (time || '').trim() || dateTime,
+            fromCallsign: (fromCallsign || '').trim(),
+            toCallsign: (toCallsign || '').trim(),
+            message: (message || '').trim(),
+          });
+        }
+      }
+
+      const netControlExists = participants.some(
+        (participant) => participant.callsign === netControlOp
+      );
+      if (!netControlExists) {
+        const nextCheckIn =
+          participants.reduce((max, participant) => Math.max(max, participant.checkInNumber), 0) + 1;
+        participants.unshift({
+          id: uuidv4(),
+          callsign: netControlOp,
+          tacticalCall: 'NET',
+          name: netControlName,
+          location: '',
+          checkInTime: dateTime,
+          checkInNumber: nextCheckIn,
+        });
+      }
+
+      const session: NetSession = {
+        id: uuidv4(),
+        name,
+        frequency,
+        netControlOp,
+        netControlName,
+        dateTime,
+        endTime: null,
+        status: 'active',
+        lastAcknowledgedEntryId: null,
+      };
+
+      const startTimeValue = new Date(dateTime).getTime();
+      set({
+        session,
+        participants,
+        logEntries,
+        startTime: Number.isNaN(startTimeValue) ? null : startTimeValue,
+        isLoading: false,
+        error: null,
+      });
+
+      invoke('save_session', { session }).catch((err) => {
+        set({ error: `Failed to save session: ${err}` });
+      });
+      for (const participant of participants) {
+        invoke('save_participant', { sessionId: session.id, participant }).catch((err) => {
+          set({ error: `Failed to save participant: ${err}` });
+        });
+      }
+      for (const entry of logEntries) {
+        invoke('save_log_entry', { sessionId: session.id, entry }).catch((err) => {
+          set({ error: `Failed to save log entry: ${err}` });
+        });
+      }
+    } catch (err) {
+      set({ error: `Failed to import CSV: ${err}` });
+    }
   },
 
   reset: () => {
